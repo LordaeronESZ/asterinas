@@ -107,7 +107,7 @@ impl Inode {
             ino: self.ino() as _,
             size: inner.file_size() as _,
             blk_size: BLOCK_SIZE,
-            blocks: inner.blocks_count() as _,
+            blocks: sectors_to_blocks(inner.sector_count()) as usize,
             atime: inner.atime(),
             mtime: inner.mtime(),
             ctime: inner.ctime(),
@@ -884,7 +884,7 @@ impl Inode {
     pub fn gid(&self) -> u32;
     pub fn file_flags(&self) -> FileFlags;
     pub fn hard_links(&self) -> u16;
-    pub fn blocks_count(&self) -> Ext2Bid;
+    pub fn logical_block_count(&self) -> Ext2Bid;
     pub fn acl(&self) -> Option<Bid>;
     pub fn atime(&self) -> Duration;
     pub fn mtime(&self) -> Duration;
@@ -1188,7 +1188,8 @@ impl InodeInner {
     pub fn hard_links(&self) -> u16;
     pub fn inc_hard_links(&mut self);
     pub fn dec_hard_links(&mut self);
-    pub fn blocks_count(&self) -> Ext2Bid;
+    pub fn logical_block_count(&self) -> Ext2Bid;
+    pub fn sector_count(&self) -> u32;
     pub fn acl(&self) -> Option<Bid>;
     pub fn set_acl(&mut self, bid: Bid);
     pub fn atime(&self) -> Duration;
@@ -1213,7 +1214,7 @@ struct InodeImpl {
 impl InodeImpl {
     pub fn new(desc: Dirty<InodeDesc>, weak_self: Weak<Inode>, fs: Weak<Ext2>) -> Self {
         let block_manager = InodeBlockManager {
-            nblocks: AtomicUsize::new(desc.blocks_count() as _),
+            nblocks: AtomicUsize::new(desc.logical_block_count() as _),
             block_ptrs: RwMutex::new(desc.block_ptrs),
             indirect_blocks: RwMutex::new(IndirectBlockCache::new(fs.clone())),
             fs,
@@ -1284,8 +1285,12 @@ impl InodeImpl {
         self.desc.hard_links -= 1;
     }
 
-    pub fn blocks_count(&self) -> Ext2Bid {
-        self.desc.blocks_count()
+    pub fn logical_block_count(&self) -> Ext2Bid {
+        self.desc.logical_block_count()
+    }
+
+    pub fn sector_count(&self) -> u32 {
+        self.desc.sector_count
     }
 
     pub fn acl(&self) -> Option<Bid> {
@@ -1396,7 +1401,7 @@ impl InodeImpl {
     /// which may result in an increased block count.
     fn expand(&mut self, new_size: usize) -> Result<()> {
         let new_blocks = self.desc.size_to_blocks(new_size);
-        let old_blocks = self.desc.blocks_count();
+        let old_blocks = self.desc.logical_block_count();
 
         // Expands block count if necessary
         if new_blocks > old_blocks {
@@ -1653,7 +1658,7 @@ impl InodeImpl {
     /// which may result in an decreased block count.
     fn shrink(&mut self, new_size: usize) {
         let new_blocks = self.desc.size_to_blocks(new_size);
-        let old_blocks = self.desc.blocks_count();
+        let old_blocks = self.desc.logical_block_count();
 
         // Shrinks block count if necessary
         if new_blocks < old_blocks {
@@ -1668,7 +1673,7 @@ impl InodeImpl {
         self.desc.size = new_size;
         self.block_manager
             .nblocks
-            .store(self.blocks_count() as _, Ordering::Release);
+            .store(self.logical_block_count() as _, Ordering::Release);
     }
 
     /// Shrinks inode blocks.
@@ -2197,16 +2202,11 @@ impl InodeDesc {
     }
 
     pub fn num_page_bytes(&self) -> usize {
-        (self.blocks_count() as usize) * BLOCK_SIZE
+        (self.logical_block_count() as usize) * BLOCK_SIZE
     }
 
-    /// Returns the actual number of blocks utilized.
-    ///
-    /// Ext2 allows the `block_count` to exceed the actual number of blocks utilized.
-    pub fn blocks_count(&self) -> Ext2Bid {
-        let blocks = self.size_to_blocks(self.size);
-        debug_assert!(blocks <= sectors_to_blocks(self.sector_count));
-        blocks
+    pub fn logical_block_count(&self) -> Ext2Bid {
+        self.size_to_blocks(self.size)
     }
 
     fn size_to_blocks(&self, size: usize) -> Ext2Bid {
