@@ -51,8 +51,12 @@ pub struct RamFs {
 
 impl RamFs {
     pub fn new() -> Arc<Self> {
+        let dev_id = device_id::PSEUDO_FS_DEVICE_ID_ALLOCATOR
+            .get()
+            .expect("PSEUDO_FS_DEVICE_ID_ALLOCATOR not initialized")
+            .allocate();
         Arc::new_cyclic(|weak_fs| Self {
-            sb: SuperBlock::new(RAMFS_MAGIC, BLOCK_SIZE, NAME_MAX),
+            sb: SuperBlock::new(RAMFS_MAGIC, BLOCK_SIZE, NAME_MAX, dev_id),
             root: Arc::new_cyclic(|weak_root| RamInode {
                 inner: Inner::new_dir(weak_root.clone(), weak_root.clone()),
                 metadata: SpinLock::new(InodeMeta::new_dir(
@@ -1169,6 +1173,7 @@ impl Inode for RamInode {
     fn metadata(&self) -> Metadata {
         let rdev = self.inner.device_id().unwrap_or(0);
         let inode_metadata = self.metadata.lock();
+        let container_dev_id = self.fs().sb().dev_id;
         Metadata {
             ino: self.ino as _,
             size: inode_metadata.size,
@@ -1182,7 +1187,7 @@ impl Inode for RamInode {
             nr_hard_links: inode_metadata.nlinks,
             uid: inode_metadata.uid,
             gid: inode_metadata.gid,
-            container_dev_id: DeviceId::none(), // FIXME: placeholder
+            container_dev_id: Some(container_dev_id),
             self_dev_id: if rdev == 0 {
                 None
             } else {

@@ -67,9 +67,13 @@ impl PseudoFs {
     ) -> &'static Arc<Self> {
         // Reference: <https://elixir.bootlin.com/linux/v6.16.5/source/fs/libfs.c#L659-L689>
         fs.call_once(|| {
+            let dev_id = device_id::PSEUDO_FS_DEVICE_ID_ALLOCATOR
+                .get()
+                .expect("PSEUDO_FS_DEVICE_ID_ALLOCATOR not initialized")
+                .allocate();
             Arc::new_cyclic(|weak_fs: &Weak<Self>| Self {
                 name,
-                sb: SuperBlock::new(magic, aster_block::BLOCK_SIZE, NAME_MAX),
+                sb: SuperBlock::new(magic, aster_block::BLOCK_SIZE, NAME_MAX, dev_id),
                 root: Arc::new(PseudoInode::new(
                     ROOT_INO,
                     PseudoInodeType::Root,
@@ -77,6 +81,7 @@ impl PseudoFs {
                     Uid::new_root(),
                     Gid::new_root(),
                     weak_fs.clone(),
+                    dev_id,
                 )),
                 inode_allocator: AtomicU64::new(ROOT_INO + 1),
                 fs_event_subscriber_stats: FsEventSubscriberStats::new(),
@@ -91,7 +96,15 @@ impl PseudoFs {
         uid: Uid,
         gid: Gid,
     ) -> PseudoInode {
-        PseudoInode::new(self.alloc_id(), type_, mode, uid, gid, Arc::downgrade(self))
+        PseudoInode::new(
+            self.alloc_id(),
+            type_,
+            mode,
+            uid,
+            gid,
+            Arc::downgrade(self),
+            self.sb.dev_id,
+        )
     }
 
     fn alloc_id(&self) -> u64 {
@@ -368,6 +381,7 @@ impl PseudoInode {
         uid: Uid,
         gid: Gid,
         fs: Weak<PseudoFs>,
+        dev_id: DeviceId,
     ) -> Self {
         let now = now();
         let type_ = InodeType::from(type_);
@@ -385,7 +399,7 @@ impl PseudoInode {
             nr_hard_links: 1,
             uid,
             gid,
-            container_dev_id: DeviceId::none(), // FIXME: placeholder
+            container_dev_id: Some(dev_id),
             self_dev_id: None,
         };
 

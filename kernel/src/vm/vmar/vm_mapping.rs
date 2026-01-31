@@ -243,7 +243,12 @@ impl VmMapping {
         let (dev_major, dev_minor) = self
             .inode()
             .map(|inode| {
-                device_id::decode_device_numbers(inode.metadata().container_dev_id.as_encoded_u64())
+                device_id::decode_device_numbers(
+                    inode
+                        .metadata()
+                        .container_dev_id
+                        .map_or(0, |id| id.as_encoded_u64()),
+                )
             })
             .unwrap_or((0, 0));
         let ino = self.inode().map(|inode| inode.ino()).unwrap_or(0);

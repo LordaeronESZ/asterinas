@@ -175,7 +175,7 @@ struct Stat {
 impl From<Metadata> for Stat {
     fn from(info: Metadata) -> Self {
         Self {
-            st_dev: info.container_dev_id.as_encoded_u64(),
+            st_dev: info.container_dev_id.map_or(0, |id| id.as_encoded_u64()),
             st_ino: info.ino,
             st_nlink: info.nr_hard_links as _,
             st_mode: info.type_ as u32 | info.mode.bits() as u32,

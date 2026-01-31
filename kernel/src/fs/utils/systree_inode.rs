@@ -12,7 +12,6 @@ use core::time::Duration;
 use aster_systree::{
     SysAttr, SysBranchNode, SysNode, SysNodeId, SysNodeType, SysObj, SysStr, SysSymlink,
 };
-use device_id::DeviceId;
 
 use super::Extension;
 use crate::{
@@ -88,7 +87,7 @@ pub(in crate::fs) trait SysTreeInodeTy: Send + Sync + 'static {
             nr_hard_links: 1,
             uid: Uid::new_root(),
             gid: Gid::new_root(),
-            container_dev_id: DeviceId::none(), // FIXME: placeholder
+            container_dev_id: None,
             self_dev_id: None,
         }
     }
@@ -336,6 +335,9 @@ impl<KInode: SysTreeInodeTy + Send + Sync + 'static> Inode for KInode {
     default fn metadata(&self) -> Metadata {
         let mut metadata = *self.metadata();
         metadata.mode = self.mode().unwrap();
+        if metadata.container_dev_id.is_none() {
+            metadata.container_dev_id = Some(self.fs().sb().dev_id);
+        }
         metadata
     }
 

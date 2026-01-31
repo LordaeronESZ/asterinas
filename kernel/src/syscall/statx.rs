@@ -128,8 +128,9 @@ impl Statx {
     fn new(path: &Path) -> Self {
         let info = path.metadata();
 
-        let (stx_dev_major, stx_dev_minor) =
-            device_id::decode_device_numbers(info.container_dev_id.as_encoded_u64());
+        let (stx_dev_major, stx_dev_minor) = device_id::decode_device_numbers(
+            info.container_dev_id.map_or(0, |id| id.as_encoded_u64()),
+        );
         let (stx_rdev_major, stx_rdev_minor) =
             device_id::decode_device_numbers(info.self_dev_id.map_or(0, |id| id.as_encoded_u64()));
 

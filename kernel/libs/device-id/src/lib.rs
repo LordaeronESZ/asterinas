@@ -79,11 +79,6 @@ impl DeviceId {
         Self(((major.get() as u32) << 20) | minor.get())
     }
 
-    /// FIXME: just a placeholder for now.
-    pub const fn none() -> Self {
-        Self(0)
-    }
-
     /// Returns the encoded `u32` value.
     pub fn to_raw(&self) -> u32 {
         self.0

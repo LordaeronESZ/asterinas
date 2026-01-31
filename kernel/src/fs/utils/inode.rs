@@ -210,7 +210,7 @@ pub struct Metadata {
     /// For pseudo files (e.g., those on sockfs), this device is also "pseudo".
     ///
     /// Corresponds to `st_dev`.
-    pub container_dev_id: DeviceId,
+    pub container_dev_id: Option<DeviceId>,
 
     /// The device ID of the inode itself, if this inode represents a special device file (character or block).
     ///
@@ -234,7 +234,7 @@ impl Metadata {
             nr_hard_links: 2,
             uid: Uid::new_root(),
             gid: Gid::new_root(),
-            container_dev_id: DeviceId::none(), // FIXME: placeholder
+            container_dev_id: None,
             self_dev_id: None,
         }
     }
@@ -254,7 +254,7 @@ impl Metadata {
             nr_hard_links: 1,
             uid: Uid::new_root(),
             gid: Gid::new_root(),
-            container_dev_id: DeviceId::none(), // FIXME: placeholder
+            container_dev_id: None,
             self_dev_id: None,
         }
     }
@@ -274,7 +274,7 @@ impl Metadata {
             nr_hard_links: 1,
             uid: Uid::new_root(),
             gid: Gid::new_root(),
-            container_dev_id: DeviceId::none(), // FIXME: placeholder
+            container_dev_id: None,
             self_dev_id: None,
         }
     }
@@ -294,7 +294,7 @@ impl Metadata {
             nr_hard_links: 1,
             uid: Uid::new_root(),
             gid: Gid::new_root(),
-            container_dev_id: DeviceId::none(), // FIXME: placeholder
+            container_dev_id: None,
             self_dev_id: Some(device.id()),
         }
     }
